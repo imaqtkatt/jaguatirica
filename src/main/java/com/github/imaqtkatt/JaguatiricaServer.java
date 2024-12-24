@@ -112,9 +112,9 @@ public class JaguatiricaServer {
 
     private Term handlePacket(Packet packet) {
         return switch (packet) {
-            case Packet.GetPacket(String key) -> state.getOrDefault(key, new Term.Error("Unbound term"));
+            case Packet.Get(String key) -> state.getOrDefault(key, new Term.Error("Unbound term"));
 
-            case Packet.SetPacket(String key, Term term) -> {
+            case Packet.Set(String key, Term term) -> {
                 state.put(key, term);
                 yield Term.OK;
             }
@@ -134,7 +134,7 @@ public class JaguatiricaServer {
                 }
             }
 
-            case Packet.UnknownPacket() -> throw new IllegalStateException("Unexpected value");
+            case Packet.Unknown() -> throw new IllegalStateException("Unexpected value");
         };
     }
 }

@@ -11,12 +11,12 @@ public final class PacketReader {
         return switch (type) {
             case Packet.TYPE_GET -> {
                 var key = readKey(byteBuffer);
-                yield new Packet.GetPacket(key);
+                yield new Packet.Get(key);
             }
             case Packet.TYPE_SET -> {
                 var key = readKey(byteBuffer);
                 var term = TermReader.readTerm(byteBuffer);
-                yield new Packet.SetPacket(key, term);
+                yield new Packet.Set(key, term);
             }
             case Packet.TYPE_INCREMENT -> {
                 var key = readKey(byteBuffer);
