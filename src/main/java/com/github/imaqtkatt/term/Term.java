@@ -2,14 +2,11 @@ package com.github.imaqtkatt.term;
 
 public sealed interface Term {
 
-    byte TYPE_ERROR = 1;
-    byte TYPE_TEXT = 2;
-    byte TYPE_INTEGER = 3;
+    byte TYPE_TEXT = 1;
+    byte TYPE_INTEGER = 2;
+    byte TYPE_SET = 3;
 
     Term OK = new Text("OK");
-
-    record Error(String reason) implements Term {
-    }
 
     record Text(String text) implements Term {
     }

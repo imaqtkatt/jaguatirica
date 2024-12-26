@@ -1,35 +1,24 @@
 package com.github.imaqtkatt.packet;
 
+import com.github.imaqtkatt.term.TermReader;
+
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.function.Function;
+
+import static com.github.imaqtkatt.packet.Utils.readString;
 
 public final class PacketReader {
 
-    public static Packet readPacket(final ByteBuffer byteBuffer) {
+    public static Packet read(final ByteBuffer byteBuffer) {
         byte type = byteBuffer.get();
-
-        return switch (type) {
-            case Packet.TYPE_GET -> {
-                var key = readKey(byteBuffer);
-                yield new Packet.Get(key);
-            }
-            case Packet.TYPE_SET -> {
-                var key = readKey(byteBuffer);
-                var term = TermReader.readTerm(byteBuffer);
-                yield new Packet.Set(key, term);
-            }
-            case Packet.TYPE_INCREMENT -> {
-                var key = readKey(byteBuffer);
-                yield new Packet.Increment(key);
-            }
-            default -> Packet.UNKNOWN;
-        };
+        return REGISTRY.getOrDefault(type, _ -> Packet.INVALID).apply(byteBuffer);
     }
 
-    private static String readKey(final ByteBuffer byteBuffer) {
-        var len = byteBuffer.getInt();
-        var bytes = new byte[len];
-        byteBuffer.get(bytes);
-        return new String(bytes, StandardCharsets.UTF_8);
-    }
+    private static final Map<Byte, Function<ByteBuffer, Packet>> REGISTRY = Map.of(
+            Packet.TYPE_GET, buf -> new Packet.Get(readString(buf)),
+            Packet.TYPE_SET, buf -> new Packet.Set(readString(buf), TermReader.read(buf)),
+            Packet.TYPE_INCREMENT, buf -> new Packet.Increment(readString(buf)),
+            Packet.TYPE_DECREMENT, buf -> new Packet.Decrement(readString(buf))
+    );
 }
