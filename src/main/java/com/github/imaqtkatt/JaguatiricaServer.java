@@ -8,6 +8,7 @@ import com.github.imaqtkatt.term.Term;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -86,17 +87,17 @@ public class JaguatiricaServer {
 
                 Packet packet;
                 try {
-                    packet = PacketReader.read(byteBuffer);
-                    packet = handlePacket(packet);
+                    packet = handlePacket(PacketReader.read(byteBuffer));
                 } catch (InvalidTermException e) {
                     packet = Packet.INVALID_TERM;
+                } catch (BufferOverflowException e) {
+                    packet = Packet.BUFFER_OVERFLOW;
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
 
                 byteBuffer.clear();
 
-//                TermWriter.write(response, byteBuffer);
                 PacketWriter.write(packet, byteBuffer);
                 byteBuffer.flip();
 
@@ -122,11 +123,14 @@ public class JaguatiricaServer {
     private static final String TERM_IS_NOT_AN_INTEGER_MSG = "Term is not an integer";
     private static final String INTEGER_OVERFLOW_MSG = "Integer overflow";
     private static final String INTEGER_UNDERFLOW_MSG = "Integer underflow";
+    private static final String TERM_IS_NOT_A_SET_MSG = "Term is not a set";
 
     private static final Packet UNBOUND_TERM_PACKET = new Packet.Error(UNBOUND_TERM_MSG);
     private static final Packet TERM_IS_NOT_AN_INTEGER_PACKET = new Packet.Error(TERM_IS_NOT_AN_INTEGER_MSG);
     private static final Packet INTEGER_OVERFLOW_PACKET = new Packet.Error(INTEGER_OVERFLOW_MSG);
     private static final Packet INTEGER_UNDERFLOW_PACKET = new Packet.Error(INTEGER_UNDERFLOW_MSG);
+    private static final Packet TERM_IS_NOT_A_SET_PACKET = new Packet.Error(TERM_IS_NOT_A_SET_MSG);
+
     private static final Packet OK_PACKET = new Packet.Ok(Term.OK);
 
     private Packet handlePacket(Packet packet) {
@@ -177,6 +181,36 @@ public class JaguatiricaServer {
                 } else {
                     yield TERM_IS_NOT_AN_INTEGER_PACKET;
                 }
+            }
+
+            case Packet.SetAdd(String key, ArrayList<String> values) -> {
+                var term = state.computeIfAbsent(key, _ -> new Term.Set(HashSet.newHashSet(2)));
+
+                if (term instanceof Term.Set(HashSet<String> set)) {
+                    var added = values.stream().filter(set::add).count();
+                    yield new Packet.Ok(new Term.Integer(added));
+                } else {
+                    yield TERM_IS_NOT_A_SET_PACKET;
+                }
+            }
+
+            case Packet.SetUnion(ArrayList<String> keys) -> {
+                var result = new HashSet<String>();
+
+                for (var key : keys) {
+                    Term term;
+                    if ((term = state.get(key)) == null) {
+                        continue;
+                    }
+
+                    if (term instanceof Term.Set(HashSet<String> set)) {
+                        result.addAll(set);
+                    } else {
+                        yield TERM_IS_NOT_A_SET_PACKET;
+                    }
+                }
+
+                yield new Packet.Ok(new Term.Set(result));
             }
         };
     }

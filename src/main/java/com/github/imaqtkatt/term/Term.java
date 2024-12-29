@@ -1,5 +1,7 @@
 package com.github.imaqtkatt.term;
 
+import java.util.HashSet;
+
 public sealed interface Term {
 
     byte TYPE_TEXT = 1;
@@ -14,6 +16,6 @@ public sealed interface Term {
     record Integer(long i) implements Term {
     }
 
-    record Set(java.util.Set<Term> set) implements Term {
+    record Set(HashSet<String> set) implements Term {
     }
 }
