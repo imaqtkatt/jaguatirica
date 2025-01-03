@@ -22,25 +22,22 @@ public final class PacketReader {
             Packet.TYPE_INCREMENT, buf -> new Packet.Increment(readString(buf)),
             Packet.TYPE_DECREMENT, buf -> new Packet.Decrement(readString(buf)),
             Packet.TYPE_SET_ADD, PacketReader::readSetAdd,
-            Packet.TYPE_SET_UNION, PacketReader::readSetUnion
+            Packet.TYPE_SET_UNION, buf -> new Packet.SetUnion(readKeys(buf)),
+            Packet.TYPE_SET_INTERSECTION, buf -> new Packet.SetIntersection(readKeys(buf))
     );
 
     private static Packet readSetAdd(ByteBuffer buf) {
         var key = readString(buf);
-        var valuesLen = buf.getInt();
-        var values = new ArrayList<String>(valuesLen);
-        for (int i = 0; i < valuesLen; i++) {
-            values.add(readString(buf));
-        }
+        var values = readKeys(buf);
         return new Packet.SetAdd(key, values);
     }
 
-    private static Packet readSetUnion(ByteBuffer buf) {
+    private static ArrayList<String> readKeys(ByteBuffer buf) {
         var keysLen = buf.getInt();
         var keys = new ArrayList<String>(keysLen);
         for (int i = 0; i < keysLen; i++) {
             keys.add(readString(buf));
         }
-        return new Packet.SetUnion(keys);
+        return keys;
     }
 }

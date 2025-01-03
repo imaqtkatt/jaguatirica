@@ -137,81 +137,130 @@ public class JaguatiricaServer {
         return switch (packet) {
             case Packet.Ok _, Packet.Error _ -> Packet.INVALID;
 
-            case Packet.Get(String key) -> {
-                Term r;
-                if ((r = state.get(key)) == null) {
-                    yield UNBOUND_TERM_PACKET;
-                } else {
-                    yield new Packet.Ok(r);
-                }
-            }
+            case Packet.Get(String key) -> handleGet(key);
 
-            case Packet.Set(String key, Term term) -> {
-                state.put(key, term);
-                yield OK_PACKET;
-            }
+            case Packet.Set(String key, Term term) -> handleSet(key, term);
 
-            case Packet.Increment(String key) -> {
-                var term = state.computeIfAbsent(key, _ -> new Term.Integer(0));
+            case Packet.Increment(String key) -> handleIncrement(key);
 
-                if (term instanceof Term.Integer(long i)) {
-                    long r = i + 1;
-                    if (((i ^ r) & (1 ^ r)) < 0) {
-                        yield INTEGER_OVERFLOW_PACKET;
-                    } else {
-                        var r2 = state.compute(key, (_, _) -> new Term.Integer(r));
-                        yield new Packet.Ok(r2);
-                    }
-                } else {
-                    yield TERM_IS_NOT_AN_INTEGER_PACKET;
-                }
-            }
+            case Packet.Decrement(String key) -> handleDecrement(key);
 
-            case Packet.Decrement(String key) -> {
-                var term = state.computeIfAbsent(key, _ -> new Term.Integer(0));
+            case Packet.SetAdd(String key, ArrayList<String> values) -> handleSetAdd(key, values);
 
-                if (term instanceof Term.Integer(long i)) {
-                    long r = i - 1;
-                    if (((i ^ 1) & (i ^ r)) < 0) {
-                        yield INTEGER_UNDERFLOW_PACKET;
-                    } else {
-                        var r2 = state.compute(key, (_, _) -> new Term.Integer(r));
-                        yield new Packet.Ok(r2);
-                    }
-                } else {
-                    yield TERM_IS_NOT_AN_INTEGER_PACKET;
-                }
-            }
+            case Packet.SetUnion(ArrayList<String> keys) -> handleSetUnion(keys);
 
-            case Packet.SetAdd(String key, ArrayList<String> values) -> {
-                var term = state.computeIfAbsent(key, _ -> new Term.Set(HashSet.newHashSet(2)));
-
-                if (term instanceof Term.Set(HashSet<String> set)) {
-                    var added = values.stream().filter(set::add).count();
-                    yield new Packet.Ok(new Term.Integer(added));
-                } else {
-                    yield TERM_IS_NOT_A_SET_PACKET;
-                }
-            }
-
-            case Packet.SetUnion(ArrayList<String> keys) -> {
-                var result = new HashSet<String>();
-
-                for (var key : keys) {
-                    Term term;
-                    if ((term = state.get(key)) == null) {
-                        continue;
-                    }
-
-                    if (term instanceof Term.Set(HashSet<String> set)) {
-                        result.addAll(set);
-                    } else {
-                        yield TERM_IS_NOT_A_SET_PACKET;
-                    }
-                }
-
-                yield new Packet.Ok(new Term.Set(result));
-            }
+            case Packet.SetIntersection(ArrayList<String> keys) -> handleSetIntersection(keys);
         };
+    }
+
+    private Packet handleGet(String key) {
+        Term r;
+        if ((r = state.get(key)) == null) {
+            return UNBOUND_TERM_PACKET;
+        } else {
+            return new Packet.Ok(r);
+        }
+    }
+
+    private Packet handleSet(String key, Term term) {
+        state.put(key, term);
+        return OK_PACKET;
+    }
+
+    private Packet handleIncrement(String key) {
+        var term = state.computeIfAbsent(key, _ -> new Term.Integer(0));
+
+        if (term instanceof Term.Integer(long i)) {
+            long r = i + 1;
+            if (((i ^ r) & (1 ^ r)) < 0) {
+                return INTEGER_OVERFLOW_PACKET;
+            } else {
+                var r2 = state.compute(key, (_, _) -> new Term.Integer(r));
+                return new Packet.Ok(r2);
+            }
+        } else {
+            return TERM_IS_NOT_AN_INTEGER_PACKET;
+        }
+    }
+
+    private Packet handleDecrement(String key) {
+        var term = state.computeIfAbsent(key, _ -> new Term.Integer(0));
+
+        if (term instanceof Term.Integer(long i)) {
+            long r = i - 1;
+            if (((i ^ 1) & (i ^ r)) < 0) {
+                return INTEGER_UNDERFLOW_PACKET;
+            } else {
+                var r2 = state.compute(key, (_, _) -> new Term.Integer(r));
+                return new Packet.Ok(r2);
+            }
+        } else {
+            return TERM_IS_NOT_AN_INTEGER_PACKET;
+        }
+    }
+
+    private Packet handleSetAdd(String key, ArrayList<String> values) {
+        var term = state.computeIfAbsent(key, _ -> new Term.Set(HashSet.newHashSet(2)));
+
+        if (term instanceof Term.Set(HashSet<String> set)) {
+            var added = values.stream().filter(set::add).count();
+            return new Packet.Ok(new Term.Integer(added));
+        } else {
+            return TERM_IS_NOT_A_SET_PACKET;
+        }
+    }
+
+    private Packet handleSetUnion(ArrayList<String> keys) {
+        var result = new HashSet<String>();
+
+        for (var key : keys) {
+            Term term;
+            if ((term = state.get(key)) == null) {
+                continue;
+            }
+
+            if (term instanceof Term.Set(HashSet<String> set)) {
+                result.addAll(set);
+            } else {
+                return TERM_IS_NOT_A_SET_PACKET;
+            }
+        }
+
+        return new Packet.Ok(new Term.Set(result));
+    }
+
+    private Packet handleSetIntersection(ArrayList<String> keys) {
+        HashSet<String> result;
+
+        var iter = keys.iterator();
+        if (!iter.hasNext()) {
+            throw new RuntimeException();
+        }
+
+        Term term;
+        if ((term = state.get(iter.next())) == null) {
+            throw new IllegalStateException();
+        }
+        if (term instanceof Term.Set(HashSet<String> set)) {
+            result = set;
+        } else {
+            return TERM_IS_NOT_A_SET_PACKET;
+        }
+
+        while (iter.hasNext()) {
+            var key = iter.next();
+            Term term2;
+            if ((term2 = state.get(key)) == null) {
+                continue;
+            }
+
+            if (term2 instanceof Term.Set(HashSet<String> set2)) {
+                result.retainAll(set2);
+            } else {
+                return TERM_IS_NOT_A_SET_PACKET;
+            }
+        }
+
+        return new Packet.Ok(new Term.Set(result));
     }
 }

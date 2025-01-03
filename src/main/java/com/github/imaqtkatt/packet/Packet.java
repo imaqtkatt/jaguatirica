@@ -16,6 +16,7 @@ public sealed interface Packet {
     byte TYPE_DECREMENT = 4;
     byte TYPE_SET_ADD = 5;
     byte TYPE_SET_UNION = 6;
+    byte TYPE_SET_INTERSECTION = 7;
 
     byte RESPONSE_FLAG = (byte) 128;
     byte TYPE_OK = 1 | RESPONSE_FLAG;
@@ -43,5 +44,8 @@ public sealed interface Packet {
     }
 
     record SetUnion(ArrayList<String> keys) implements Packet {
+    }
+
+    record SetIntersection(ArrayList<String> keys) implements Packet {
     }
 }
